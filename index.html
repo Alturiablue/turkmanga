@@ -1,114 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Manga Panel Translator</title>
+  <meta charset="UTF-8" />
+  <title>Manga Chapter Viewer + Translator</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
-    canvas { max-width: 100%; border: 1px solid #ccc; margin-top: 20px; }
-    #output { margin-top: 20px; white-space: pre-wrap; background: #f0f0f0; padding: 10px; }
+    body { font-family: sans-serif; max-width: 900px; margin: auto; padding: 20px; }
+    #fileInput { margin-bottom: 15px; }
+    #thumbnails { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+    #thumbnails img {
+      width: 100px; height: auto; cursor: pointer; border: 2px solid transparent;
+      border-radius: 4px;
+    }
+    #thumbnails img.selected {
+      border-color: blue;
+    }
+    canvas { max-width: 100%; border: 1px solid #ccc; display: block; margin-bottom: 10px; }
+    #output { white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 5px; min-height: 50px; }
   </style>
 </head>
 <body>
-  <h1>Manga Panel OCR + Turkish Translation</h1>
-  <input type="file" id="imageInput" accept="image/*"><br><br>
+  <h1>Manga Chapter Viewer + Translator</h1>
+  <input type="file" id="fileInput" accept="image/*" multiple />
+  <div id="thumbnails"></div>
   <canvas id="canvas"></canvas>
-  <div id="output">Upload a manga panel image to begin...</div>
+  <div id="output">Upload images to start...</div>
 
   <script>
-    const apiKey = "YOUR_API_KEY_HERE"; // Replace this with your real Google Cloud API key
+    const apiKey = "YOUR_API_KEY"; // Replace with your Google Cloud API key
 
-    const imageInput = document.getElementById("imageInput");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-
-    imageInput.addEventListener("change", async function () {
-      const file = imageInput.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Image = reader.result.split(',')[1];
-
-        const img = new Image();
-        img.onload = async function () {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-
-          // Step 1: OCR
-          const visionRes = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
-            method: "POST",
-            body: JSON.stringify({
-              requests: [{
-                image: { content: base64Image },
-                features: [{ type: "TEXT_DETECTION" }]
-              }]
-            }),
-            headers: { "Content-Type": "application/json" }
-          });
-
-          const visionData = await visionRes.json();
-          const annotations = visionData.responses[0].textAnnotations;
-          if (!annotations || annotations.length === 0) {
-            document.getElementById("output").textContent = "No text detected.";
-            return;
-          }
-
-          const fullText = annotations[0].description;
-          const words = annotations.slice(1); // individual words
-
-          // Step 2: Translate the full text
-          const translateRes = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              q: fullText,
-              source: "zh",
-              target: "tr",
-              format: "text"
-            })
-          });
-
-          const translateData = await translateRes.json();
-          const turkishText = translateData.data.translations[0].translatedText;
-          document.getElementById("output").textContent = "Full Turkish translation:\n\n" + turkishText;
-
-          // Step 3: Replace text in image (draw Turkish words)
-          ctx.fillStyle = "white";
-          ctx.strokeStyle = "white";
-
-          words.forEach((word) => {
-            const box = word.boundingPoly.vertices;
-            const minX = Math.min(...box.map(p => p.x || 0));
-            const minY = Math.min(...box.map(p => p.y || 0));
-            const maxX = Math.max(...box.map(p => p.x || 0));
-            const maxY = Math.max(...box.map(p => p.y || 0));
-
-            const w = maxX - minX;
-            const h = maxY - minY;
-
-            // Clear old Chinese text
-            ctx.fillRect(minX - 2, minY - 2, w + 4, h + 4);
-          });
-
-          // Step 4: Overlay Turkish text
-          ctx.fillStyle = "black";
-          ctx.font = "16px sans-serif";
-          ctx.textBaseline = "top";
-          const turkishLines = turkishText.split("\n");
-
-          let currentY = 10;
-          for (const line of turkishLines) {
-            ctx.fillText(line, 10, currentY);
-            currentY += 24;
-          }
-        };
-
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  </script>
-</body>
-</html>
+    const fileInput =
